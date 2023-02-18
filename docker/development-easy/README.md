@@ -40,7 +40,7 @@ You can create new patients by navigating to the `Patients` menu.
 
 ## Access the database
 
-You can access the OpenEMR MySQL/MariaDB database by accessing the URL `http://dlyog02:8310/`. The username is `root` and the password is `root`. This will give you a good perspective of the OpenEMR schema.
+You can access the OpenEMR MySQL/MariaDB database by accessing the URL `http://localhost:8310/`. The username is `root` and the password is `root`. This will give you a good perspective of the OpenEMR schema.
 
 ## Clean up
 
