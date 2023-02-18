@@ -48,7 +48,9 @@ To free up space, you can uninstall the Docker container, volume, network, and i
 
 ### Stop all running containers and remove them
 
-docker stop $(docker ps -aq) && docker rm $(docker ps -aq)
+docker stop $(docker ps -aq) 
+
+docker rm $(docker ps -aq)
 
 ### o clean up all Docker volumes, networks, and stopped containers
 
