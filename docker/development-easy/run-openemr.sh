@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Make the file executable
+# Make the file executable.
 chmod +x openemr-cmd
 
 # Run the file with "up" command

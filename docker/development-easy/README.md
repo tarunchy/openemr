@@ -1,64 +1,56 @@
-# OpenEMR-Cmd Documentation
+# Setup OpenEMR in Local in 30 minutes
 
-## Overview
+This guide will show you how to set up OpenEMR on your local machine in under 30 minutes. We will be using a Docker-based development environment.
 
-OpenEMR-Cmd is similar to devtools, it helps developers to manage and troubleshoot openemr outside the docker,see more detail [here](https://github.com/openemr/openemr/blob/master/CONTRIBUTING.md).
-OpenEMR-Cmd-H is getting the help from openemr-cmd -h quickly.
+## Prerequisites
 
-## Implementation
+- Unix-based system (Linux or macOS)
+- Docker installed and running
 
-1. Copy the script to local linux environment, create the bin directory if it does not exist. (May have to use ~/.local/bin for newer versions of Ubuntu in steps 1 and 2 so the script is found in $PATH.)
+For Windows-based systems, you can either install VirtualBox and run a Linux virtual machine, or you can use the Windows Subsystem for Linux.
 
-```
-mkdir ~/bin
-curl -L https://raw.githubusercontent.com/openemr/openemr-devops/master/utilities/openemr-cmd/openemr-cmd > ~/bin/openemr-cmd
-curl -L https://raw.githubusercontent.com/openemr/openemr-devops/master/utilities/openemr-cmd/openemr-cmd-h > ~/bin/openemr-cmd-h
-```
+## Clone the repo
 
-2. Apply executable permissions to the script.
-
-```
-chmod +x ~/bin/openemr-cmd
-chmod +x ~/bin/openemr-cmd-h
-```
-
-3. Test the installation.
-
-```
-# openemr-cmd
-Usage: openemr-cmd COMMAND [ARGS]
-Commands:
-  --help                       Show the commands usage
-  --version                    Show the openemr-cmd command version
+Clone the OpenEMR repository using the following command:
 
 
-# openemr-cmd-h
-To search the keyword from openemr-cmd -h output quickly
-  Usage: openemr-cmd-h keyword
-  e.g.   openemr-cmd-h ssl
-  h                         openemr-cmd -h
-  docker                    docker-management
-  php                       php-management
-  test                      test-management
-  sweep                     sweep-management
-  reset                     reset-management
-  backup                    backup-management
-  ssl                       ssl-management
-  mul                       multisite-management
-  api                       api-management
-  com                       computational-health-informatics
-  webroot                   webroot-management
-  others                    others
-  keyword                   grep from openemr-cmd -h
+git clone git@github.com:tarunchy/openemr.git
 
-# openemr-cmd-h test
-test-management:
-  ut, unit-test                      To run unit testing
-  at, api-test                       To run api testing
-  et, e2e-test                       To run e2e testing
-  st, services-test                  To run services testing
-  ft, fixtures-test                  To run fixtures testing
-  vt, validators-test                To run validators testing
-  ct, controllers-test               To run controllers testing
-  ctt, common-test                   To run common testing
-```
+
+## Run the development environment
+
+Change the directory to `./openemr/docker/development-easy` and run the `run-openemr.sh` script. This will start the development environment.
+
+cd openemr/docker/development-easy
+./run-openemr.sh
+
+
+> **Note:** The `run-openemr.sh` script only works on Unix-based systems. If you are using Windows, you can either install VirtualBox and run a Linux virtual machine, or you can use the Windows Subsystem for Linux.
+
+## Check the installation status
+
+Use the `openemr-cmd dl` command to check if the installation is complete.
+
+
+## Access OpenEMR
+
+Once the installation is complete, you can access the OpenEMR login page at `https://localhost:9300`. The initial username is `admin` and the password is `pass`.
+
+You can create new patients by navigating to the `Patients` menu.
+
+## Access the database
+
+You can access the OpenEMR MySQL/MariaDB database by accessing the URL `http://dlyog02:8310/`. The username is `root` and the password is `root`. This will give you a good perspective of the OpenEMR schema.
+
+## Clean up
+
+To free up space, you can uninstall the Docker container, volume, network, and images using the following command:
+
+docker system prune -af --volumes
+
+
+> **Caution:** Do not interrupt the running application when you are cleaning up.
+
+## Conclusion
+
+Congratulations! You have successfully set up OpenEMR on your local machine. If you encounter any issues or have any questions post in Class forum.
