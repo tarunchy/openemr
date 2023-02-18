@@ -52,7 +52,7 @@ docker stop $(docker ps -aq)
 
 docker rm $(docker ps -aq)
 
-### o clean up all Docker volumes, networks, and stopped containers
+### To clean up all Docker volumes, networks, and stopped containers
 
 docker system prune -af --volumes
 
