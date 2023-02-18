@@ -46,8 +46,26 @@ You can access the OpenEMR MySQL/MariaDB database by accessing the URL `http://d
 
 To free up space, you can uninstall the Docker container, volume, network, and images using the following command:
 
+### Stop all running containers and remove them
+docker stop $(docker ps -aq) && docker rm $(docker ps -aq)
+### o clean up all Docker volumes, networks, and stopped containers
 docker system prune -af --volumes
 
+This command will remove:
+
+All stopped containers
+All networks not used by at least one container
+All volumes not used by at least one container
+All images without at least one container associated to them
+The -a flag removes all unused images in addition to the other resources, and the --volumes flag removes all unused volumes.
+
+Keep in mind that this command will delete all unused resources, including those that may be important to your system. Make sure to review the list of resources to be deleted before confirming the command.
+
+You can also use individual commands to remove volumes and networks separately:
+
+To remove all unused volumes, use docker volume prune.
+To remove all unused networks, use docker network prune.
+Note that removing volumes and networks can potentially cause data loss, so make sure you don't need any of them before running these commands.
 
 > **Caution:** Do not interrupt the running application when you are cleaning up.
 
