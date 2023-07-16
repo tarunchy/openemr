@@ -46,6 +46,11 @@ use OpenEMR\Menu\PatientMenuRole;
 use OpenEMR\OeUI\OemrUI;
 use OpenEMR\Patient\Cards\PortalCard;
 use OpenEMR\Reminder\BirthdayReminder;
+use OpenEMR\Services\AllergyIntoleranceService;
+use OpenEMR\Services\ConditionService;
+use OpenEMR\Services\ImmunizationService;
+use OpenEMR\Services\PatientIssuesService;
+use OpenEMR\Services\PatientService;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 
 $twig = new TwigContainer(null, $GLOBALS['kernel']);
@@ -54,6 +59,9 @@ $twig = new TwigContainer(null, $GLOBALS['kernel']);
 if (isset($_GET['set_pid'])) {
     require_once("$srcdir/pid.inc.php");
     setpid($_GET['set_pid']);
+    $ptService = new PatientService();
+    $newPatient = $ptService->findByPid($pid);
+    $ptService->touchRecentPatientList($newPatient);
     if (isset($_GET['set_encounterid']) && ((int)$_GET['set_encounterid'] > 0)) {
         $encounter = (int)$_GET['set_encounterid'];
         SessionUtil::setSession('encounter', $encounter);
@@ -477,6 +485,7 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
                 dialogId: 'editscripts',
                 type: 'iframe'
             });
+            return false;
         }
 
         /**
@@ -1007,12 +1016,170 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
             $idcard_doc_id = get_document_by_catg($pid, $GLOBALS['patient_id_category_name'], 3);
         }
         ?>
-        <div class="main mb-5">
+        <div class="main mb-1">
             <!-- start main content div -->
+            <div class="row">
+                    <?php
+                    $t = $twig->getTwig();
+
+                    $allergy = (AclMain::aclCheckIssue('allergy')) ? 1 : 0;
+                    $pl = (AclMain::aclCheckIssue('medical_problem')) ? 1 : 0;
+                    $meds = (AclMain::aclCheckIssue('medication')) ? 1 : 0;
+                    $cards = $allergy + $pl + $meds;
+                    $col = "p-1 ";
+
+                    switch ($cards) {
+                        case '1':
+                            $col .= "col-12";
+                            break;
+
+                        case '2':
+                            $col .= "col-6";
+                            break;
+
+                        case '3':
+                            $col .= "col-4";
+                            break;
+
+                        default:
+                            $col .= "col";
+                            break;
+                    }
+
+                    // ALLERGY CARD
+                    if (AclMain::aclCheckIssue('allergy')) {
+                        $allergyService = new AllergyIntoleranceService();
+                        $allergyList = $allergyService->getAll();
+                        $viewArgs = [
+                            'title' => xl('Allergies'),
+                            'card_container_class_list' => ['flex-fill', 'mx-1'],
+                            'id' => 'allergies_ps_expand',
+                            'forceAlwaysOpen' => true,
+                            'linkMethod' => "javascript",
+                            'list' => $allergyList->getData(),
+                            'auth' => true,
+                            'btnLabel' => 'Edit',
+                            'btnLink' => "return load_location('{$GLOBALS['webroot']}/interface/patient_file/summary/stats_full.php?active=all&category=allergy')"
+                        ];
+                        echo "<div class=\"$col\">";
+                        echo $t->render('patient/card/allergies.html.twig', $viewArgs);
+                        echo "</div>";
+                    }
+
+                    $patIssueService = new PatientIssuesService();
+
+                    // MEDICAL PROBLEMS CARD
+                    if (AclMain::aclCheckIssue('medical_problem')) {
+                        $medProblemList = $patIssueService->search(['lists.pid' => $pid, 'lists.type' => 'medical_problem']);
+                        $viewArgs = [
+                            'title' => xl('Medical Problems'),
+                            'card_container_class_list' => ['flex-fill', 'mx-1'],
+                            'id' => 'medical_problem_ps_expand',
+                            'forceAlwaysOpen' => true,
+                            'linkMethod' => "javascript",
+                            'list' => $medProblemList->getData(),
+                            'auth' => true,
+                            'btnLabel' => 'Edit',
+                            'btnLink' => "return load_location('{$GLOBALS['webroot']}/interface/patient_file/summary/stats_full.php?active=all&category=medical_problem')"
+                        ];
+                        echo "<div class=\"$col\">";
+                        echo $t->render('patient/card/medical_problems.html.twig', $viewArgs);
+                        echo "</div>";
+                    }
+
+                    // MEDICATION CARD
+                    if (AclMain::aclCheckIssue('medication')) {
+                        $medList = $patIssueService->search(['lists.pid' => $pid, 'lists.type' => 'medication']);
+                        $viewArgs = [
+                            'title' => xl('Medications'),
+                            'card_container_class_list' => ['flex-fill', 'mx-1'],
+                            'id' => 'medications_ps_expand',
+                            'forceAlwaysOpen' => true,
+                            'linkMethod' => "javascript",
+                            'list' => $medList->getData(),
+                            'auth' => true,
+                            'btnLabel' => 'Edit',
+                            'btnLink' => "return load_location('{$GLOBALS['webroot']}/interface/patient_file/summary/stats_full.php?active=all&category=medication')"
+                        ];
+                        echo "<div class=\"$col\">";
+                        echo $t->render('patient/card/medication.html.twig', $viewArgs);
+                        echo "</div>";
+                    }
+
+                    // Render the Prescriptions card if turned on
+                    if (!$GLOBALS['disable_prescriptions'] && AclMain::aclCheckCore('patients', 'rx')) :
+                        if ($GLOBALS['erx_enable'] && $display_current_medications_below == 1) {
+                            $sql = "SELECT * FROM prescriptions WHERE patient_id = ? AND active = '1'";
+                            $res = sqlStatement($sql, [$pid]);
+
+                            $rxArr = [];
+                            while ($row = sqlFetchArray($res)) {
+                                $row['unit'] = generate_display_field(array('data_type' => '1', 'list_id' => 'drug_units'), $row['unit']);
+                                $row['form'] = generate_display_field(array('data_type' => '1', 'list_id' => 'drug_form'), $row['form']);
+                                $row['route'] = generate_display_field(array('data_type' => '1', 'list_id' => 'drug_route'), $row['route']);
+                                $row['interval'] = generate_display_field(array('data_type' => '1', 'list_id' => 'drug_interval'), $row['interval']);
+                                $rxArr[] = $row;
+                            }
+                            $id = "current_prescriptions_ps_expand";
+                            $viewArgs = [
+                                'title' => xl('Current Medications'),
+                                'id' => $id,
+                                'forceAlwaysOpen' => (getUserSetting($id) == 0) ? false : true,
+                                'auth' => false,
+                                'rxList' => $rxArr,
+                            ];
+
+                            echo $t->render('patient/card/erx.html.twig', $viewArgs);
+                        }
+
+                        $id = "prescriptions_ps_expand";
+                        $viewArgs = [
+                            'title' => xl("Prescriptions"),
+                            'card_container_class_list' => ['flex-fill', 'mx-1'],
+                            'id' => $id,
+                            'forceAlwaysOpen' => (getUserSetting($id) == 0) ? false : true,
+                            'btnLabel' => "Edit",
+                            'auth' => AclMain::aclCheckCore('patients', 'rx', '', ['write', 'addonly']),
+                        ];
+
+                        if ($GLOBALS['erx_enable']) {
+                            $viewArgs['title'] = 'Prescription History';
+                            $viewArgs['btnLabel'] = 'Add';
+                            $viewArgs['btnLink'] = "{$GLOBALS['webroot']}/interface/eRx.php?page=compose";
+                        } elseif ($GLOBALS['weno_rx_enable']) {
+                            // weno plus button which opens their iframe
+                            $viewArgs['weno'] = true;
+                            $viewArgs['title'] = "WENO ComposeRx";
+                            $viewArgs['btnLabel'] = 'Add';
+                            $viewArgs['btnLink'] = "{$GLOBALS['webroot']}/interface/weno/indexrx.php";
+                            $viewArgs['btnClass'] = "iframe";
+                            $viewArgs['linkMethod'] = "javascript";
+                            $viewArgs['btnLink'] = "editScripts('{$GLOBALS['webroot']}/controller.php?prescription&list&id=" . attr_url($pid) . "')";
+                        } else {
+                            $viewArgs['btnLink'] = "editScripts('{$GLOBALS['webroot']}/controller.php?prescription&list&id=" . attr_url($pid) . "')";
+                            $viewArgs['linkMethod'] = "javascript";
+                            $viewArgs['btnClass'] = "iframe";
+                        }
+
+                        $cwd = getcwd();
+                        chdir("../../../");
+                        $c = new Controller();
+                        // This is a hacky way to get a Smarty template from the controller and injecting it into
+                        // a Twig template. This reduces the amount of refactoring that is required but ideally the
+                        // Smarty template should be upgraded to Twig
+                        ob_start();
+                        echo $c->act(['prescription' => '', 'fragment' => '', 'patient_id' => $pid]);
+                        $viewArgs['content'] = ob_get_contents();
+                        ob_end_clean();
+
+                        echo $t->render('patient/card/rx.html.twig', $viewArgs);
+                    endif;
+                    ?>
+                </div>
+            </div>
             <div class="row">
                 <div class="col-md-8">
                     <?php
-
                     if ($deceased > 0) :
                         echo $twig->getTwig()->render('patient/partials/deceased.html.twig', [
                             'deceasedDays' => deceasedDays($deceased),
@@ -1021,8 +1188,6 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
 
                     $sectionRenderEvents = $ed->dispatch(new SectionEvent('primary'), SectionEvent::EVENT_HANDLE);
                     $sectionCards = $sectionRenderEvents->getCards();
-
-                    $t = $twig->getTwig();
 
                     foreach ($sectionCards as $card) {
                         $_auth = $card->getAcl();
@@ -1128,7 +1293,11 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
                         while ($row = sqlFetchArray($res)) {
                             if ($row['provider']) {
                                 // since the query is sorted by DATE DESC can use prior ins type to identify
+                                // unless insurance date_end is applicable
                                 $row['isOld'] = (!empty($row['date_end']) && $row['date_end'] <= date("Y-m-d")) ? true : false;
+                                if (!$row['isOld']) {
+                                    $row['isOld'] = (strcmp($row['type'], $prior_ins_type) == 0) ? true : false;
+                                }
                                 $icobj = new InsuranceCompany($row['provider']);
                                 $adobj = $icobj->get_address();
                                 $insco_name = trim($icobj->get_name());
@@ -1352,7 +1521,7 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
                             'id' => $id,
                             'initiallyCollapsed' => (getUserSetting($id) == 0) ? false : true,
                             'btnLabel' => 'Trend',
-                            'btnLink' => "../encounter/trend_form.php?formname=vitals",
+                            'btnLink' => "../encounter/trend_form.php?formname=vitals&context=dashboard",
                             'linkMethod' => 'html',
                             'bodyClass' => 'collapse show',
                             'auth' => $widgetAuth,
@@ -1396,7 +1565,7 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
                             'id' => $vitals_form_id,
                             'initiallyCollapsed' => getUserSetting($vitals_form_id) == true ? true : false,
                             'btnLabel' => 'Trend',
-                            'btnLink' => "../encounter/trend_form.php?formname=vitals",
+                            'btnLink' => "../encounter/trend_form.php?formname=vitals&context=dashboard",
                             'linkMethod' => 'html',
                             'bodyClass' => 'notab collapse show',
                             'auth' => $widgetAuth,
@@ -1410,8 +1579,9 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
                 <div class="col-md-4">
                     <!-- start right column div -->
                     <?php
-                    // it's important enough to always show it
-                    $portalCard = new PortalCard($GLOBALS);
+                    if ($GLOBALS['portal_onsite_two_enable']) {
+                        $portalCard = new PortalCard($GLOBALS);
+                    }
 
                     $sectionRenderEvents = $ed->dispatch(new SectionEvent('secondary'), SectionEvent::EVENT_HANDLE);
                     $sectionCards = $sectionRenderEvents->getCards();
@@ -1767,9 +1937,9 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
 
                     // Show PAST appointments.
                     // added by Terry Hill to allow reverse sorting of the appointments
-                    $direction = "ASC";
+                    $direction = '1';
                     if ($GLOBALS['num_past_appointments_to_show'] < 0) {
-                        $direction = "DESC";
+                        $direction = '2';
                         ($showpast = -1 * $GLOBALS['num_past_appointments_to_show']);
                     } else {
                         $showpast = $GLOBALS['num_past_appointments_to_show'];
@@ -1778,21 +1948,11 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
                     if (isset($pid) && !$GLOBALS['disable_calendar'] && $showpast > 0 && AclMain::aclCheckCore('patients', 'appt')) {
                         $displayPastAppts = true;
 
-                        $query = "SELECT e.pc_eid, e.pc_aid, e.pc_title, e.pc_eventDate, e.pc_startTime, e.pc_hometext, u.fname, u.lname, u.mname, c.pc_catname, e.pc_apptstatus, e.pc_facility
-                            FROM openemr_postcalendar_events AS e,
-                                users AS u,
-                                openemr_postcalendar_categories AS c
-                            WHERE e.pc_pid = ?
-                                AND e.pc_eventDate < CURRENT_DATE
-                                AND u.id = e.pc_aid
-                                AND e.pc_catid = c.pc_catid
-                            ORDER BY e.pc_eventDate " . escape_sort_order($direction) . " , e.pc_startTime DESC LIMIT " . escape_limit($showpast);
-
-                        $pres = sqlStatement($query, array($pid));
+                        $pastAppts = fetchXPastAppts($pid, $showpast, $direction); // This line added by epsdky
 
                         $count = 0;
 
-                        while ($row = sqlFetchArray($pres)) {
+                        foreach ($pastAppts as $row) {
                             $count++;
                             $dayname = date("D", strtotime($row['pc_eventDate']));
                             $displayMeridiem = ($GLOBALS['time_display_format'] == 0) ? "" : "am";
@@ -1816,7 +1976,7 @@ $oemr_ui = new OemrUI($arrOeUiSettings);
                             $row['dayName'] = $dayname;
                             $row['displayMeridiem'] = $displayMeridiem;
                             $row['pc_eventTime'] = sprintf("%02d", $disphour) . ":{$dispmin}";
-                            $row['uname'] = text($row['fname'] . " " . $row['lname']);
+                            $row['uname'] = text($row['ufname'] . " " . $row['ulname']);
                             $row['jsEvent'] = attr_js(preg_replace("/-/", "", $row['pc_eventDate'])) . ', ' . attr_js($row['pc_eid']);
                             $past_appts[] = $row;
                         }

@@ -34,7 +34,7 @@ var page = {
     presentAdminSignature: false,
     presentWitnessSignature: false,
     signaturesRequired: false,
-
+    inFormEdit: false,
     init: function () {
         // ensure initialization only occurs once
         if (page.isInitialized || page.isInitializing) {
@@ -206,7 +206,7 @@ var page = {
                 $("#submitTemplate").hide();
                 $("#sendTemplate").hide();
                 $("#downloadTemplate").hide();
-                isModule ? $("#dismissOnsiteDocumentButton").show() : $("#dismissOnsiteDocumentButton").hide();
+                isModule ? $(".dismissOnsiteDocumentButton").show() : $(".dismissOnsiteDocumentButton").hide();
                 ((isModule || page.isFrameForm) && !page.isLocked) ? $("#saveTemplate").show() : $("#saveTemplate").hide();
                 isModule ? $("#homeTemplate").show() : $("#homeTemplate").hide();
                 (page.encounterFormName === 'HIS' && !page.isLocked) ? $("#chartHistory").show() : $("#chartHistory").hide();
@@ -616,14 +616,15 @@ var page = {
         let currentNameStyled = currentName.substr(0, currentName.lastIndexOf('.')) || currentName;
         currentNameStyled = currentNameStyled.replace(/[`~!@#$%^&*()_|+\-=?;:'",.<>\{\}\[\]\\\/]/gi, ' ');
         if (currentName === 'Help') {
-            $("#dismissOnsiteDocumentButton").addClass("d-none");
+            $(".dismissOnsiteDocumentButton").addClass("d-none");
         } else {
-            $("#dismissOnsiteDocumentButton").removeClass("d-none");
+            $(".dismissOnsiteDocumentButton").removeClass("d-none");
         }
         page.isFrameForm = 0;
         page.encounterFormId = 0;
         page.encounterFormName = '';
         if (docid !== 'Help') {
+            page.inFormEdit = true;
             $("#topnav").hide();
         }
         if (currentName === templateName && currentName && !page.isNewDoc) {
@@ -685,11 +686,10 @@ var page = {
                             $('#patientSignature').css('cursor', 'default').off();
                             $('#witnessSignature').css('cursor', 'default').off();
                         }
-                        bindFetch();
-
-                        if (page.isFrameForm) {
-                            //$("#editorContainer").removeClass('w-100').addClass('w-auto');
+                        if (typeof bindFetch == 'function') {
+                            bindFetch();
                         }
+
                         // new encounter form
                         // lbf has own signer instance. no binding here.
                         // page.encounterFormName & page.isFrameForm is set from template directive
@@ -848,6 +848,10 @@ var page = {
             // no frame content is maintained in onsite document activity but template directives are.
             templateContent = templateContent.replace("id=0", "id=" + page.encounterFormId);
         }
+        // removing for testing
+        /* if (isPortal) {
+            templateContent = page.encode(templateContent, parseInt(csrfTokenDoclib[0]));
+        } */
         page.onsiteDocument.save({
             'pid': cpid,
             'facility': page.formOrigin, /* 0 portal, 1 dashboard, 2 patient documents */
@@ -866,7 +870,8 @@ var page = {
             'patientSignature': ptsignature,
             'fullDocument': templateContent,
             'fileName': page.onsiteDocument.get('fileName'),
-            'filePath': page.onsiteDocument.get('filePath')
+            'filePath': page.onsiteDocument.get('filePath'),
+            'csrf_token_form': csrfTokenDoclib
         }, {
             wait: true,
             success: function () {
@@ -902,6 +907,7 @@ var page = {
                     page.showDetailDialog(page.onsiteDocument);
                 }
                 signerAlertMsg(msgSuccess, 2000, 'success');
+                page.inFormEdit = false;
                 if (page.isCharted && isModule) {
                     $("#a_docReturn").click();
                     return;
